@@ -39,6 +39,7 @@
 #include <cxxabi.h>
 #include <cstdlib>
 #include <type_traits>
+#include <memory>
 
 namespace cmdline{
 
@@ -108,16 +109,16 @@ std::string readable_typename()
   return demangle(typeid(T).name());
 }
 
-template <class T>
-std::string default_value(T def)
-{
-  return detail::lexical_cast<std::string>(def);
-}
-
 template <>
 inline std::string readable_typename<std::string>()
 {
   return "string";
+}
+
+template <class T>
+std::string default_value(T def)
+{
+  return detail::lexical_cast<std::string>(def);
 }
 
 } // detail
@@ -183,19 +184,14 @@ oneof_reader<T> oneof(std::initializer_list<T> l)
 
 class parser{
 public:
-  parser(){
-  }
-  ~parser(){
-    for (std::map<std::string, option_base*>::iterator p=options.begin();
-         p!=options.end(); p++)
-      delete p->second;
-  }
+  parser(){}
+  ~parser(){}
 
   void add(const std::string &name,
            char short_name=0,
            const std::string &desc=""){
     if (options.count(name)) throw cmdline_error("multiple definition: "+name);
-    options[name]=new option_without_value(name, short_name, desc);
+    options[name] = std::make_shared<option_without_value>(name, short_name, desc);
     ordered.push_back(options[name]);
   }
 
@@ -216,7 +212,7 @@ public:
            const T def=T(),
            F reader=F()){
     if (options.count(name)) throw cmdline_error("multiple definition: "+name);
-    options[name]=new option_with_value_with_reader<T, F>(name, short_name, need, def, desc, reader);
+    options[name]=std::make_shared<option_with_value_with_reader<T, F>>(name, short_name, need, def, desc, reader);
     ordered.push_back(options[name]);
   }
 
@@ -236,7 +232,7 @@ public:
   template <class T>
   const T &get(const std::string &name) const {
     if (options.count(name)==0) throw cmdline_error("there is no flag: --"+name);
-    const option_with_value<T> *p=dynamic_cast<const option_with_value<T>*>(options.find(name)->second);
+    const option_with_value<T> *p=dynamic_cast<const option_with_value<T>*>(options.find(name)->second.get());
     if (p==NULL) throw cmdline_error("type mismatch flag '"+name+"'");
     return p->get();
   }
@@ -309,17 +305,16 @@ public:
       prog_name=argv[0];
 
     std::map<char, std::string> lookup;
-    for (std::map<std::string, option_base*>::iterator p=options.begin();
-         p!=options.end(); p++){
-      if (p->first.length()==0) continue;
-      char initial=p->second->short_name();
+    for (auto& item : options){
+      if (item.first.length()==0) continue;
+      char initial=item.second->short_name();
       if (initial){
         if (lookup.count(initial)>0){
           lookup[initial]="";
           errors.push_back(std::string("short option '")+initial+"' is ambiguous");
           return false;
         }
-        else lookup[initial]=p->first;
+        else lookup[initial]=item.first;
       }
     }
 
@@ -390,10 +385,9 @@ public:
       }
     }
 
-    for (std::map<std::string, option_base*>::iterator p=options.begin();
-         p!=options.end(); p++)
-      if (!p->second->valid())
-        errors.push_back("need option: --"+std::string(p->first));
+    for (auto& item : options)
+      if (!item.second->valid())
+        errors.push_back("need option: --"+std::string(item.first));
 
     return errors.size()==0;
   }
@@ -670,8 +664,8 @@ private:
     F reader;
   };
 
-  std::map<std::string, option_base*> options;
-  std::vector<option_base*> ordered;
+  std::map<std::string, std::shared_ptr<option_base>> options;
+  std::vector<std::shared_ptr<option_base>> ordered;
   std::string ftr;
 
   std::string prog_name;

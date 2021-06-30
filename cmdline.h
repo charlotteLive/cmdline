@@ -510,7 +510,7 @@ private:
     option_without_value(const std::string &name,
                          char short_name,
                          const std::string &desc)
-      :nam(name), snam(short_name), desc(desc), has(false){
+      :m_name(name), m_sName(short_name), m_desc(desc), has(false){
     }
     ~option_without_value(){}
 
@@ -538,25 +538,25 @@ private:
     }
 
     const std::string &name() const{
-      return nam;
+      return m_name;
     }
 
     char short_name() const{
-      return snam;
+      return m_sName;
     }
 
     const std::string &description() const {
-      return desc;
+      return m_desc;
     }
 
     std::string short_description() const{
-      return "--"+nam;
+      return "--"+m_name;
     }
 
   private:
-    std::string nam;
-    char snam;
-    std::string desc;
+    std::string m_name;
+    char m_sName;
+    std::string m_desc;
     bool has;
   };
 
@@ -568,9 +568,9 @@ private:
                       bool need,
                       const T &def,
                       const std::string &desc)
-      : nam(name), snam(short_name), need(need), has(false)
+      : m_name(name), m_sName(short_name), m_need(need), has(false)
       , def(def), actual(def) {
-      this->desc=full_description(desc);
+      m_desc=full_description(desc);
     }
     ~option_with_value(){}
 
@@ -600,44 +600,44 @@ private:
     }
 
     bool valid() const{
-      if (need && !has) return false;
+      if (m_need && !has) return false;
       return true;
     }
 
     bool must() const{
-      return need;
+      return m_need;
     }
 
     const std::string &name() const{
-      return nam;
+      return m_name;
     }
 
     char short_name() const{
-      return snam;
+      return m_sName;
     }
 
     const std::string &description() const {
-      return desc;
+      return m_desc;
     }
 
     std::string short_description() const{
-      return "--"+nam+"="+detail::readable_typename<T>();
+      return "--"+m_name+"="+detail::readable_typename<T>();
     }
 
   protected:
     std::string full_description(const std::string &desc){
       return
         desc+" ("+detail::readable_typename<T>()+
-        (need?"":" [="+detail::default_value<T>(def)+"]")
+        (m_need?"":" [="+detail::default_value<T>(def)+"]")
         +")";
     }
 
     virtual T read(const std::string &s)=0;
 
-    std::string nam;
-    char snam;
-    bool need;
-    std::string desc;
+    std::string m_name;
+    char m_sName;
+    bool m_need;
+    std::string m_desc;
 
     bool has;
     T def;

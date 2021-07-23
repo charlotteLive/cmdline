@@ -246,10 +246,6 @@ public:
   }
 
   std::string error() const{
-    return errors.size()>0?errors[0]:"";
-  }
-
-  std::string error_full() const{
     std::ostringstream oss;
     for (size_t i=0; i<errors.size(); i++)
       oss<<errors[i]<<std::endl;

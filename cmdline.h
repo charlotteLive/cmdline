@@ -184,7 +184,7 @@ oneof_reader<T> oneof(std::initializer_list<T> l)
 
 class parser{
 public:
-  parser(){}
+  parser(){ add("help", '?', "print usage message"); }
   ~parser(){}
 
   void add(const std::string &name,
@@ -216,10 +216,6 @@ public:
     ordered.push_back(options[name]);
   }
 
-  void footer(const std::string &f){
-    ftr=f;
-  }
-
   void set_program_name(const std::string &name){
     prog_name=name;
   }
@@ -241,48 +237,57 @@ public:
     return others;
   }
 
-  bool parse(const std::string &arg){
-    std::vector<std::string> args;
-
-    std::string buf;
-    bool in_quote=false;
-    for (std::string::size_type i=0; i<arg.length(); i++){
-      if (arg[i]=='\"'){
-        in_quote=!in_quote;
-        continue;
-      }
-
-      if (arg[i]==' ' && !in_quote){
-        args.push_back(buf);
-        buf="";
-        continue;
-      }
-
-      if (arg[i]=='\\'){
-        i++;
-        if (i>=arg.length()){
-          errors.push_back("unexpected occurrence of '\\' at end of string");
-          return false;
-        }
-      }
-
-      buf+=arg[i];
-    }
-
-    if (in_quote){
-      errors.push_back("quote is not closed");
-      return false;
-    }
-
-    if (buf.length()>0)
-      args.push_back(buf);
-
-    for (size_t i=0; i<args.size(); i++)
-      std::cout<<"\""<<args[i]<<"\""<<std::endl;
-
-    return parse(args);
+  void parse_check(const std::vector<std::string> &args){
+    check(args.size(), parse(args));
   }
 
+  void parse_check(int argc, char *argv[]){
+    check(argc, parse(argc, argv));
+  }
+
+  std::string error() const{
+    return errors.size()>0?errors[0]:"";
+  }
+
+  std::string error_full() const{
+    std::ostringstream oss;
+    for (size_t i=0; i<errors.size(); i++)
+      oss<<errors[i]<<std::endl;
+    return oss.str();
+  }
+
+  std::string usage() const {
+    std::ostringstream oss;
+    oss<<"usage: "<<prog_name<<" ";
+    for (size_t i=0; i<ordered.size(); i++){
+      if (ordered[i]->must())
+        oss<<ordered[i]->short_description()<<" ";
+    }
+
+    oss << std::endl;
+    oss<<"options:"<<std::endl;
+
+    size_t max_width=0;
+    for (size_t i=0; i<ordered.size(); i++){
+      max_width=std::max(max_width, ordered[i]->name().length());
+    }
+    for (size_t i=0; i<ordered.size(); i++){
+      if (ordered[i]->short_name()){
+        oss<<"  -"<<ordered[i]->short_name()<<", ";
+      }
+      else{
+        oss<<"      ";
+      }
+
+      oss<<"--"<<ordered[i]->name();
+      for (size_t j=ordered[i]->name().length(); j<max_width+4; j++)
+        oss<<' ';
+      oss<<ordered[i]->description()<<std::endl;
+    }
+    return oss.str();
+  }
+
+private:
   bool parse(const std::vector<std::string> &args){
     int argc=static_cast<int>(args.size());
     std::vector<const char*> argv(argc);
@@ -301,7 +306,7 @@ public:
       errors.push_back("argument number must be longer than 0");
       return false;
     }
-    if (prog_name=="")
+    if (prog_name.empty())
       prog_name=argv[0];
 
     std::map<char, std::string> lookup;
@@ -391,68 +396,6 @@ public:
 
     return errors.size()==0;
   }
-
-  void parse_check(const std::string &arg){
-    if (!options.count("help"))
-      add("help", '?', "print this message");
-    check(0, parse(arg));
-  }
-
-  void parse_check(const std::vector<std::string> &args){
-    if (!options.count("help"))
-      add("help", '?', "print this message");
-    check(args.size(), parse(args));
-  }
-
-  void parse_check(int argc, char *argv[]){
-    if (!options.count("help"))
-      add("help", '?', "print this message");
-    check(argc, parse(argc, argv));
-  }
-
-  std::string error() const{
-    return errors.size()>0?errors[0]:"";
-  }
-
-  std::string error_full() const{
-    std::ostringstream oss;
-    for (size_t i=0; i<errors.size(); i++)
-      oss<<errors[i]<<std::endl;
-    return oss.str();
-  }
-
-  std::string usage() const {
-    std::ostringstream oss;
-    oss<<"usage: "<<prog_name<<" ";
-    for (size_t i=0; i<ordered.size(); i++){
-      if (ordered[i]->must())
-        oss<<ordered[i]->short_description()<<" ";
-    }
-    
-    oss<<"[options] ... "<<ftr<<std::endl;
-    oss<<"options:"<<std::endl;
-
-    size_t max_width=0;
-    for (size_t i=0; i<ordered.size(); i++){
-      max_width=std::max(max_width, ordered[i]->name().length());
-    }
-    for (size_t i=0; i<ordered.size(); i++){
-      if (ordered[i]->short_name()){
-        oss<<"  -"<<ordered[i]->short_name()<<", ";
-      }
-      else{
-        oss<<"      ";
-      }
-
-      oss<<"--"<<ordered[i]->name();
-      for (size_t j=ordered[i]->name().length(); j<max_width+4; j++)
-        oss<<' ';
-      oss<<ordered[i]->description()<<std::endl;
-    }
-    return oss.str();
-  }
-
-private:
 
   void check(int argc, bool ok){
     if ((argc==1 && !ok) || exist("help")){
@@ -666,7 +609,6 @@ private:
 
   std::map<std::string, std::shared_ptr<option_base>> options;
   std::vector<std::shared_ptr<option_base>> ordered;
-  std::string ftr;
 
   std::string prog_name;
   std::vector<std::string> others;
